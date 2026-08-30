@@ -1,3 +1,4 @@
+cat > README.md << 'EOF'
 # CyberEagle-Scanner
 
 轻量级 Web 安全扫描器，用于学习教育目的。
