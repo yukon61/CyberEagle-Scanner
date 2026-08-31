@@ -1,81 +1,186 @@
 #!/usr/bin/env python3
 """
-CyberEagle-Scanner - Web Security Scanner
-轻量级 Web 安全扫描器，用于学习教育目的
+CyberEagle-Scanner - 轻量级 Web 漏洞扫描器
+支持：目录扫描、SQL注入、XSS、命令注入、MQTT检测
 """
 
 import argparse
 import sys
+import logging
+from datetime import datetime
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s - %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+
+def banner():
+    """打印项目 Banner"""
+    print("""
+    ╔═══════════════════════════════════════════════════════════════╗
+    ║                                                               ║
+    ║      CyberEagle-Scanner v0.2.0                               ║
+    ║      轻量级 Web 漏洞扫描器                                   ║
+    ║      支持: 目录扫描 | SQL注入 | XSS | 命令注入 | MQTT        ║
+    ║                                                               ║
+    ╚═══════════════════════════════════════════════════════════════╝
+    """)
+
 
 def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(
-        description="CyberEagle-Scanner - Web Security Scanner",
-        epilog="示例: python main.py -u http://127.0.0.1 -v"
+        description="CyberEagle-Scanner - 轻量级 Web 漏洞扫描器",
+        epilog="示例: python main.py -u http://127.0.0.1 --dir --sqli"
     )
-    
+
+    # 必选参数：目标 URL
     parser.add_argument(
         "-u", "--url",
         required=True,
         help="目标 URL（如 http://127.0.0.1）"
     )
-    
+
+    # 模块开关（使用 store_true 表示 flag 参数）
     parser.add_argument(
-        "-d", "--depth",
-        type=int,
-        default=1,
-        help="扫描深度（默认 1）"
+        "--dir", action="store_true",
+        help="启用目录/文件扫描"
     )
-    
+    parser.add_argument(
+        "--sqli", action="store_true",
+        help="启用 SQL 注入检测"
+    )
+    parser.add_argument(
+        "--xss", action="store_true",
+        help="启用 XSS 检测"
+    )
+    parser.add_argument(
+        "--cmd", action="store_true",
+        help="启用命令注入检测"
+    )
+    parser.add_argument(
+        "--mqtt", action="store_true",
+        help="启用 MQTT 弱口令/匿名访问检测"
+    )
+
+    # 通用参数
     parser.add_argument(
         "-t", "--threads",
         type=int,
-        default=20,
-        help="线程数（默认 20）"
+        default=10,
+        help="线程数（默认 10）"
     )
-    
     parser.add_argument(
         "-o", "--output",
         help="输出报告的文件路径"
     )
-    
     parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="显示详细输出"
     )
-    
+
+    # 便捷参数：一键全开
+    parser.add_argument(
+        "--all", action="store_true",
+        help="启用所有检测模块（等价于 --dir --sqli --xss --cmd --mqtt）"
+    )
+
     return parser.parse_args()
+
+
+def run_scanners(args):
+    """
+    根据用户选择的模块调用相应的扫描函数
+    """
+    url = args.url.rstrip('/')
+    threads = args.threads
+    verbose = args.verbose
+
+    # 如果启用了 --all，自动开启所有模块
+    if args.all:
+        args.dir = args.sqli = args.xss = args.cmd = args.mqtt = True
+
+    logger.info(f"目标 URL: {url}")
+    logger.info(f"线程数: {threads}")
+    logger.info("=" * 60)
+
+
+    if args.dir:
+    	logger.info("[*] 开始目录扫描...")
+    	try:
+        	from scanner.dir_scanner import DirScanner
+        	scanner = DirScanner(
+            		base_url=url,
+            		wordlist_path="payloads/dirs.txt",
+            		threads=threads,
+            		verbose=verbose
+        	)
+        	results = scanner.scan()
+        	# 保存结果到全局，供后续报告使用
+        	if hasattr(args, '_results'):
+            		args._results['dir'] = results
+        	else:
+            		args._results = {'dir': results}
+    	except ImportError:
+        	logger.error("目录扫描模块导入失败，请检查 scanner/dir_scanner.py")
+    	except Exception as e:
+        	logger.error(f"目录扫描失败: {e}")
+
+
+
+
+    if args.sqli:
+        logger.info("[*] 开始 SQL 注入检测...")
+        # TODO: 调用 scanner/sqli_scanner.py 的 scan_sqli()
+        print("   [占位] SQL 注入检测功能开发中...")
+
+    if args.xss:
+        logger.info("[*] 开始 XSS 检测...")
+        # TODO: 调用 scanner/xss_scanner.py 的 scan_xss()
+        print("   [占位] XSS 检测功能开发中...")
+
+    if args.cmd:
+        logger.info("[*] 开始命令注入检测...")
+        # TODO: 调用 scanner/cmd_scanner.py 的 scan_cmd_injection()
+        print("   [占位] 命令注入检测功能开发中...")
+
+    if args.mqtt:
+        logger.info("[*] 开始 MQTT 安全检测...")
+        # TODO: 调用 scanner/mqtt_scanner.py 的 scan_mqtt()
+        print("   [占位] MQTT 检测功能开发中...")
+
+    logger.info("=" * 60)
+    logger.info("[+] 扫描完成！")
+
 
 def main():
     args = parse_arguments()
-    
-    print("""
-    ╔═══════════════════════════════════════════════╗
-    ║     CyberEagle-Scanner v0.1.0                ║
-    ║    轻量级 Web 安全扫描器                      ║
-    ╚═══════════════════════════════════════════════╝
-    """)
-    
-    print(f"[*] 目标 URL: {args.url}")
-    print(f"[*] 扫描深度: {args.depth}")
-    print(f"[*] 线程数: {args.threads}")
-    
-    if args.verbose:
-        print("[*] 详细模式: 已开启")
-    if args.output:
-        print(f"[*] 报告输出: {args.output}")
-    
-    print("\n[+] 扫描开始...")
-    # TODO: 后续实现扫描逻辑
-    print("[+] 扫描完成！")
 
-if __name__ == "__main__":
+    # 显示 Banner
+    banner()
+
+    # 如果启用 verbose，调整日志级别
+    if args.verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+
+    # 执行扫描
     try:
-        main()
+        run_scanners(args)
     except KeyboardInterrupt:
         print("\n[!] 用户中断，退出...")
         sys.exit(0)
     except Exception as e:
-        print(f"\n[!] 发生错误: {e}")
+        logger.error(f"扫描过程中发生错误: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

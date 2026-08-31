@@ -1,0 +1,115 @@
+# 常见 Web 目录与文件字典（仅供学习测试）
+
+# 后台目录
+admin
+administrator
+manage
+manager
+dashboard
+panel
+control
+system
+backend
+cms
+
+# 常见入口
+login
+wp-admin
+wp-login
+phpmyadmin
+pma
+myadmin
+
+# 配置文件
+.env
+.git
+.svn
+.htaccess
+.htpasswd
+web.config
+php.ini
+config.php
+settings.php
+conf.php
+
+# 备份文件
+backup.zip
+backup.tar.gz
+backup.sql
+db.sql
+www.zip
+site.zip
+
+# 常用文件
+index.php
+index.html
+default.php
+robots.txt
+sitemap.xml
+phpinfo.php
+crossdomain.xml
+
+# 敏感路径
+logs
+tmp
+temp
+cache
+sessions
+upload
+uploads
+files
+downloads
+
+# 静态资源
+css
+js
+images
+img
+assets
+static
+media
+
+# 开发环境
+dev
+development
+stage
+staging
+test
+testing
+
+# 框架/库
+vendor
+node_modules
+bower_components
+themes
+plugins
+modules
+includes
+inc
+app
+src
+lib
+core
+common
+
+# API 相关
+api
+v1
+v2
+graphql
+swagger
+docs
+
+# 错误页面
+error
+404
+403
+500
+
+# 服务端状态
+server-status
+server-info
+
+# 其他
+.well-known
+acme-challenge
