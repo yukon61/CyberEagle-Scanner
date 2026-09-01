@@ -79,6 +79,10 @@ def parse_arguments():
         help="输出报告的文件路径"
     )
     parser.add_argument(
+        "--cookie",
+        help="手动指定 Cookie 字符串（如 'PHPSESSID=xxx; security=low'）"
+    )
+    parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="显示详细输出"
@@ -110,34 +114,71 @@ def run_scanners(args):
     logger.info("=" * 60)
 
 
+    # ========== 解析 --cookie 参数 ==========
+    cookies = None
+    if args.cookie:
+        try:
+            # 解析 "key1=value1; key2=value2" 格式
+            cookies = {}
+            for item in args.cookie.split(';'):
+                item = item.strip()
+                if '=' in item:
+                    k, v = item.split('=', 1)
+                    cookies[k.strip()] = v.strip()
+            logger.info(f"[*] 使用自定义 Cookie: {cookies}")
+        except Exception as e:
+            logger.warning(f"解析 Cookie 失败: {e}，将不使用 Cookie")
+    # ========================================
+
+
     if args.dir:
-    	logger.info("[*] 开始目录扫描...")
-    	try:
-        	from scanner.dir_scanner import DirScanner
-        	scanner = DirScanner(
-            		base_url=url,
-            		wordlist_path="payloads/dirs.txt",
-            		threads=threads,
-            		verbose=verbose
-        	)
-        	results = scanner.scan()
-        	# 保存结果到全局，供后续报告使用
-        	if hasattr(args, '_results'):
-            		args._results['dir'] = results
-        	else:
-            		args._results = {'dir': results}
-    	except ImportError:
-        	logger.error("目录扫描模块导入失败，请检查 scanner/dir_scanner.py")
-    	except Exception as e:
-        	logger.error(f"目录扫描失败: {e}")
+        logger.info("[*] 开始目录扫描...")
+        try:
+            from scanner.dir_scanner import DirScanner
+            scanner = DirScanner(
+                    base_url=url,
+                    wordlist_path="payloads/dirs.txt",
+                    threads=threads,
+                    verbose=verbose
+            )
+            results = scanner.scan()
+            # 保存结果到全局，供后续报告使用
+            if hasattr(args, '_results'):
+                    args._results['dir'] = results
+            else:
+                    args._results = {'dir': results}
+        except ImportError:
+            logger.error("目录扫描模块导入失败，请检查 scanner/dir_scanner.py")
+        except Exception as e:
+            logger.error(f"目录扫描失败: {e}")
 
 
 
 
     if args.sqli:
         logger.info("[*] 开始 SQL 注入检测...")
-        # TODO: 调用 scanner/sqli_scanner.py 的 scan_sqli()
-        print("   [占位] SQL 注入检测功能开发中...")
+        try:
+            from scanner.sqli_scanner import SQLiScanner
+            scanner = SQLiScanner(
+                    base_url=url,
+                    threads=threads,
+                    timeout=5,
+                    verbose=verbose,
+                    delay=0.1,
+                    cookies=cookies
+            )
+            results = scanner.scan()
+            if hasattr(args, '_results'):
+                    args._results['sqli'] = results
+            else:
+                    args._results = {'sqli': results}
+        except ImportError as e:
+            logger.error(f"SQL注入模块导入失败: {e}")
+        except Exception as e:
+            logger.error(f"SQL注入检测失败: {e}")
+
+
+
 
     if args.xss:
         logger.info("[*] 开始 XSS 检测...")
