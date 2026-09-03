@@ -178,12 +178,28 @@ def run_scanners(args):
             logger.error(f"SQL注入检测失败: {e}")
 
 
-
-
     if args.xss:
         logger.info("[*] 开始 XSS 检测...")
-        # TODO: 调用 scanner/xss_scanner.py 的 scan_xss()
-        print("   [占位] XSS 检测功能开发中...")
+        try:
+            from scanner.xss_scanner import XSSScanner
+            scanner = XSSScanner(
+                base_url=url,
+                threads=threads,
+                timeout=5,
+                verbose=verbose,
+                delay=0.1,
+                cookies=cookies
+            )
+            results = scanner.scan()
+            if hasattr(args, '_results'):
+                args._results['xss'] = results
+            else:
+                args._results = {'xss': results}
+        except ImportError as e:
+            logger.error(f"XSS模块导入失败: {e}")
+        except Exception as e:
+            logger.error(f"XSS检测失败: {e}")
+
 
     if args.cmd:
         logger.info("[*] 开始命令注入检测...")
