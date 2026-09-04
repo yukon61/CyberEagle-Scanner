@@ -203,16 +203,26 @@ def run_scanners(args):
 
     if args.cmd:
         logger.info("[*] 开始命令注入检测...")
-        # TODO: 调用 scanner/cmd_scanner.py 的 scan_cmd_injection()
-        print("   [占位] 命令注入检测功能开发中...")
+        try:
+            from scanner.cmd_scanner import CmdScanner
+            scanner = CmdScanner(
+                base_url=url,
+                threads=threads,
+                timeout=5,
+                verbose=verbose,
+                delay=0.1,
+                cookies=cookies
+            )
+            results = scanner.scan()
+            if hasattr(args, '_results'):
+                args._results['cmd'] = results
+            else:
+                args._results = {'cmd': results}
+        except ImportError as e:
+            logger.error(f"命令注入模块导入失败: {e}")
+        except Exception as e:
+            logger.error(f"命令注入检测失败: {e}")
 
-    if args.mqtt:
-        logger.info("[*] 开始 MQTT 安全检测...")
-        # TODO: 调用 scanner/mqtt_scanner.py 的 scan_mqtt()
-        print("   [占位] MQTT 检测功能开发中...")
-
-    logger.info("=" * 60)
-    logger.info("[+] 扫描完成！")
 
 
 def main():
