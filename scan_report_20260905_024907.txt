@@ -1,0 +1,13 @@
+============================================================
+CyberEagle-Scanner 扫描报告
+扫描时间: 2026-09-05 02:49:07
+目标 URL: http://127.0.0.1/vulnerabilities/sqli/?id=1&Submit=Submit
+发现漏洞总数: 1
+============================================================
+
+[SQLI] 共发现 1 个漏洞
+  1. 数据库错误信息被回显
+     参数: id
+     Payload: '
+     URL: http://127.0.0.1/vulnerabilities/sqli/?id=%27&Submit=Submit
+

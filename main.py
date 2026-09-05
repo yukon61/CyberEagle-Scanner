@@ -7,6 +7,8 @@ CyberEagle-Scanner - 轻量级 Web 漏洞扫描器
 import argparse
 import sys
 import logging
+import json
+import os
 from datetime import datetime
 
 # 配置日志
@@ -19,11 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 def banner():
-    """打印项目 Banner"""
     print("""
     ╔═══════════════════════════════════════════════════════════════╗
     ║                                                               ║
-    ║      CyberEagle-Scanner v0.2.0                               ║
+    ║      CyberEagle-Scanner v0.3.0                               ║
     ║      轻量级 Web 漏洞扫描器                                   ║
     ║      支持: 目录扫描 | SQL注入 | XSS | 命令注入 | MQTT        ║
     ║                                                               ║
@@ -32,210 +33,178 @@ def banner():
 
 
 def parse_arguments():
-    """解析命令行参数"""
     parser = argparse.ArgumentParser(
         description="CyberEagle-Scanner - 轻量级 Web 漏洞扫描器",
         epilog="示例: python main.py -u http://127.0.0.1 --dir --sqli"
     )
-
-    # 必选参数：目标 URL
-    parser.add_argument(
-        "-u", "--url",
-        required=True,
-        help="目标 URL（如 http://127.0.0.1）"
-    )
-
-    # 模块开关（使用 store_true 表示 flag 参数）
-    parser.add_argument(
-        "--dir", action="store_true",
-        help="启用目录/文件扫描"
-    )
-    parser.add_argument(
-        "--sqli", action="store_true",
-        help="启用 SQL 注入检测"
-    )
-    parser.add_argument(
-        "--xss", action="store_true",
-        help="启用 XSS 检测"
-    )
-    parser.add_argument(
-        "--cmd", action="store_true",
-        help="启用命令注入检测"
-    )
-    parser.add_argument(
-        "--mqtt", action="store_true",
-        help="启用 MQTT 弱口令/匿名访问检测"
-    )
-
-    # 通用参数
-    parser.add_argument(
-        "-t", "--threads",
-        type=int,
-        default=10,
-        help="线程数（默认 10）"
-    )
-    parser.add_argument(
-        "-o", "--output",
-        help="输出报告的文件路径"
-    )
-    parser.add_argument(
-        "--cookie",
-        help="手动指定 Cookie 字符串（如 'PHPSESSID=xxx; security=low'）"
-    )
-    parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="显示详细输出"
-    )
-
-    # 便捷参数：一键全开
-    parser.add_argument(
-        "--all", action="store_true",
-        help="启用所有检测模块（等价于 --dir --sqli --xss --cmd --mqtt）"
-    )
-
+    parser.add_argument("-u", "--url", required=True, help="目标 URL")
+    parser.add_argument("--dir", action="store_true", help="启用目录扫描")
+    parser.add_argument("--sqli", action="store_true", help="启用 SQL 注入检测")
+    parser.add_argument("--xss", action="store_true", help="启用 XSS 检测")
+    parser.add_argument("--cmd", action="store_true", help="启用命令注入检测")
+    parser.add_argument("--mqtt", action="store_true", help="启用 MQTT 检测")
+    parser.add_argument("-t", "--threads", type=int, default=10, help="线程数（默认10）")
+    parser.add_argument("-o", "--output", help="报告输出路径（默认自动生成）")
+    parser.add_argument("--cookie", help="手动指定 Cookie 字符串")
+    parser.add_argument("-v", "--verbose", action="store_true", help="显示详细输出")
+    parser.add_argument("--all", action="store_true", help="启用所有检测模块")
     return parser.parse_args()
 
 
+def generate_report(all_results, url, output_path=None):
+    """生成 TXT 和 HTML 报告"""
+    if output_path is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = f"scan_report_{timestamp}"
+    
+    txt_path = f"{output_path}.txt"
+    html_path = f"{output_path}.html"
+    
+    # ---- 统计漏洞总数 ----
+    total_vulns = 0
+    for module, results in all_results.items():
+        total_vulns += len(results) if isinstance(results, list) else 0
+    
+    # ---- 生成 TXT 报告 ----
+    with open(txt_path, 'w', encoding='utf-8') as f:
+        f.write("="*60 + "\n")
+        f.write("CyberEagle-Scanner 扫描报告\n")
+        f.write(f"扫描时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"目标 URL: {url}\n")
+        f.write(f"发现漏洞总数: {total_vulns}\n")
+        f.write("="*60 + "\n\n")
+        
+        for module, results in all_results.items():
+            module_name = module.upper()
+            f.write(f"[{module_name}] 共发现 {len(results)} 个漏洞\n")
+            for idx, vuln in enumerate(results, 1):
+                f.write(f"  {idx}. {vuln.get('details', '')}\n")
+                f.write(f"     参数: {vuln.get('param', 'N/A')}\n")
+                f.write(f"     Payload: {vuln.get('payload', 'N/A')[:80]}\n")
+                f.write(f"     URL: {vuln.get('url', 'N/A')}\n\n")
+    
+    # ---- 生成 HTML 报告 ----
+    with open(html_path, 'w', encoding='utf-8') as f:
+        f.write(f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>CyberEagle 扫描报告</title>
+<style>
+body {{ font-family: sans-serif; margin: 20px; }}
+h1 {{ color: #2c3e50; }}
+table {{ border-collapse: collapse; width: 100%; }}
+th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+th {{ background-color: #2c3e50; color: white; }}
+tr:nth-child(even) {{ background-color: #f2f2f2; }}
+.summary {{ background: #ecf0f1; padding: 15px; border-radius: 5px; }}
+</style></head>
+<body>
+<h1>🦅 CyberEagle-Scanner 扫描报告</h1>
+<div class="summary">
+<p><strong>目标:</strong> {url}</p>
+<p><strong>时间:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+<p><strong>漏洞总数:</strong> {total_vulns}</p>
+</div>
+<h2>漏洞详情</h2>
+<table>
+<tr><th>模块</th><th>参数</th><th>详情</th><th>Payload</th></tr>
+""")
+        for module, results in all_results.items():
+            for vuln in results:
+                f.write(f"<tr><td>{module}</td><td>{vuln.get('param','')}</td><td>{vuln.get('details','')}</td><td><code>{vuln.get('payload','')[:60]}</code></td></tr>")
+        f.write("</table></body></html>")
+    
+    logger.info(f"✅ 报告已生成: {txt_path}, {html_path}")
+    return txt_path, html_path
+
+
 def run_scanners(args):
-    """
-    根据用户选择的模块调用相应的扫描函数
-    """
     url = args.url.rstrip('/')
     threads = args.threads
     verbose = args.verbose
 
-    # 如果启用了 --all，自动开启所有模块
     if args.all:
         args.dir = args.sqli = args.xss = args.cmd = args.mqtt = True
+
+    # 解析 Cookie
+    cookies = None
+    if args.cookie:
+        cookies = {}
+        for item in args.cookie.split(';'):
+            item = item.strip()
+            if '=' in item:
+                k, v = item.split('=', 1)
+                cookies[k.strip()] = v.strip()
+        logger.info(f"[*] 使用自定义 Cookie: {cookies}")
 
     logger.info(f"目标 URL: {url}")
     logger.info(f"线程数: {threads}")
     logger.info("=" * 60)
 
+    all_results = {}
 
-    # ========== 解析 --cookie 参数 ==========
-    cookies = None
-    if args.cookie:
-        try:
-            # 解析 "key1=value1; key2=value2" 格式
-            cookies = {}
-            for item in args.cookie.split(';'):
-                item = item.strip()
-                if '=' in item:
-                    k, v = item.split('=', 1)
-                    cookies[k.strip()] = v.strip()
-            logger.info(f"[*] 使用自定义 Cookie: {cookies}")
-        except Exception as e:
-            logger.warning(f"解析 Cookie 失败: {e}，将不使用 Cookie")
-    # ========================================
-
-
+    # 各模块调用（仅当启用）
     if args.dir:
         logger.info("[*] 开始目录扫描...")
         try:
             from scanner.dir_scanner import DirScanner
-            scanner = DirScanner(
-                    base_url=url,
-                    wordlist_path="payloads/dirs.txt",
-                    threads=threads,
-                    verbose=verbose
-            )
-            results = scanner.scan()
-            # 保存结果到全局，供后续报告使用
-            if hasattr(args, '_results'):
-                    args._results['dir'] = results
-            else:
-                    args._results = {'dir': results}
-        except ImportError:
-            logger.error("目录扫描模块导入失败，请检查 scanner/dir_scanner.py")
+            scanner = DirScanner(base_url=url, wordlist_path="payloads/dirs.txt",
+                                 threads=threads, verbose=verbose)
+            all_results['dir'] = scanner.scan()
         except Exception as e:
             logger.error(f"目录扫描失败: {e}")
-
-
-
 
     if args.sqli:
         logger.info("[*] 开始 SQL 注入检测...")
         try:
             from scanner.sqli_scanner import SQLiScanner
-            scanner = SQLiScanner(
-                    base_url=url,
-                    threads=threads,
-                    timeout=5,
-                    verbose=verbose,
-                    delay=0.1,
-                    cookies=cookies
-            )
-            results = scanner.scan()
-            if hasattr(args, '_results'):
-                    args._results['sqli'] = results
-            else:
-                    args._results = {'sqli': results}
-        except ImportError as e:
-            logger.error(f"SQL注入模块导入失败: {e}")
+            scanner = SQLiScanner(base_url=url, threads=threads, timeout=5,
+                                  verbose=verbose, delay=0.1, cookies=cookies)
+            all_results['sqli'] = scanner.scan()
         except Exception as e:
             logger.error(f"SQL注入检测失败: {e}")
-
 
     if args.xss:
         logger.info("[*] 开始 XSS 检测...")
         try:
             from scanner.xss_scanner import XSSScanner
-            scanner = XSSScanner(
-                base_url=url,
-                threads=threads,
-                timeout=5,
-                verbose=verbose,
-                delay=0.1,
-                cookies=cookies
-            )
-            results = scanner.scan()
-            if hasattr(args, '_results'):
-                args._results['xss'] = results
-            else:
-                args._results = {'xss': results}
-        except ImportError as e:
-            logger.error(f"XSS模块导入失败: {e}")
+            scanner = XSSScanner(base_url=url, threads=threads, timeout=5,
+                                 verbose=verbose, delay=0.1, cookies=cookies)
+            all_results['xss'] = scanner.scan()
         except Exception as e:
             logger.error(f"XSS检测失败: {e}")
-
 
     if args.cmd:
         logger.info("[*] 开始命令注入检测...")
         try:
             from scanner.cmd_scanner import CmdScanner
-            scanner = CmdScanner(
-                base_url=url,
-                threads=threads,
-                timeout=5,
-                verbose=verbose,
-                delay=0.1,
-                cookies=cookies
-            )
-            results = scanner.scan()
-            if hasattr(args, '_results'):
-                args._results['cmd'] = results
-            else:
-                args._results = {'cmd': results}
-        except ImportError as e:
-            logger.error(f"命令注入模块导入失败: {e}")
+            scanner = CmdScanner(base_url=url, threads=threads, timeout=5,
+                                 verbose=verbose, delay=0.1, cookies=cookies)
+            all_results['cmd'] = scanner.scan()
         except Exception as e:
             logger.error(f"命令注入检测失败: {e}")
 
+    if args.mqtt:
+        logger.info("[*] 开始 MQTT 检测...")
+        print("   [占位] MQTT 检测功能开发中...")
+
+    logger.info("=" * 60)
+    logger.info("[+] 扫描完成！")
+
+    # 生成报告
+    if any(all_results.values()):
+        output_path = args.output
+        generate_report(all_results, url, output_path)
+    else:
+        logger.warning("未发现任何漏洞或没有启用模块")
+
+    return all_results
 
 
 def main():
     args = parse_arguments()
-
-    # 显示 Banner
     banner()
-
-    # 如果启用 verbose，调整日志级别
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-
-    # 执行扫描
     try:
         run_scanners(args)
     except KeyboardInterrupt:

