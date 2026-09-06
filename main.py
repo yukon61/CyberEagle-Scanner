@@ -42,12 +42,25 @@ def parse_arguments():
     parser.add_argument("--sqli", action="store_true", help="启用 SQL 注入检测")
     parser.add_argument("--xss", action="store_true", help="启用 XSS 检测")
     parser.add_argument("--cmd", action="store_true", help="启用命令注入检测")
-    parser.add_argument("--mqtt", action="store_true", help="启用 MQTT 检测")
     parser.add_argument("-t", "--threads", type=int, default=10, help="线程数（默认10）")
     parser.add_argument("-o", "--output", help="报告输出路径（默认自动生成）")
     parser.add_argument("--cookie", help="手动指定 Cookie 字符串")
     parser.add_argument("-v", "--verbose", action="store_true", help="显示详细输出")
     parser.add_argument("--all", action="store_true", help="启用所有检测模块")
+    parser.add_argument(
+        "--mqtt", action="store_true",
+        help="启用 MQTT 弱口令/匿名访问检测"
+    )
+    parser.add_argument(
+        "--mqtt-host",
+        help="MQTT Broker 地址（默认使用 -u 的主机部分）"
+    )
+    parser.add_argument(
+        "--mqtt-port",
+        type=int,
+        default=1883,
+        help="MQTT Broker 端口（默认 1883）"
+    )
     return parser.parse_args()
 
 
@@ -63,7 +76,14 @@ def generate_report(all_results, url, output_path=None):
     # ---- 统计漏洞总数 ----
     total_vulns = 0
     for module, results in all_results.items():
-        total_vulns += len(results) if isinstance(results, list) else 0
+        if isinstance(results, dict):
+            # MQTT 模块返回字典
+            if results.get('anonymous'):
+                total_vulns += 1
+            total_vulns += len(results.get('weak_credentials', []))
+        else:
+            # 其他模块返回列表
+            total_vulns += len(results)
     
     # ---- 生成 TXT 报告 ----
     with open(txt_path, 'w', encoding='utf-8') as f:
@@ -76,12 +96,26 @@ def generate_report(all_results, url, output_path=None):
         
         for module, results in all_results.items():
             module_name = module.upper()
-            f.write(f"[{module_name}] 共发现 {len(results)} 个漏洞\n")
-            for idx, vuln in enumerate(results, 1):
-                f.write(f"  {idx}. {vuln.get('details', '')}\n")
-                f.write(f"     参数: {vuln.get('param', 'N/A')}\n")
-                f.write(f"     Payload: {vuln.get('payload', 'N/A')[:80]}\n")
-                f.write(f"     URL: {vuln.get('url', 'N/A')}\n\n")
+            if isinstance(results, dict):
+                # ---- MQTT 模块 ----
+                f.write(f"[{module_name}] 检测结果:\n")
+                f.write(f"  匿名访问: {'开启 (高危)' if results.get('anonymous') else '关闭'}\n")
+                weak = results.get('weak_credentials', [])
+                if weak:
+                    f.write(f"  弱口令: {len(weak)} 组\n")
+                    for cred in weak:
+                        f.write(f"    {cred[0]}:{cred[1]}\n")
+                else:
+                    f.write(f"  弱口令: 未发现\n")
+                f.write("\n")
+            else:
+                # ---- 其他模块 ----
+                f.write(f"[{module_name}] 共发现 {len(results)} 个漏洞\n")
+                for idx, vuln in enumerate(results, 1):
+                    f.write(f"  {idx}. {vuln.get('details', '')}\n")
+                    f.write(f"     参数: {vuln.get('param', 'N/A')}\n")
+                    f.write(f"     Payload: {vuln.get('payload', 'N/A')[:80]}\n")
+                    f.write(f"     URL: {vuln.get('url', 'N/A')}\n\n")
     
     # ---- 生成 HTML 报告 ----
     with open(html_path, 'w', encoding='utf-8') as f:
@@ -91,26 +125,39 @@ def generate_report(all_results, url, output_path=None):
 <style>
 body {{ font-family: sans-serif; margin: 20px; }}
 h1 {{ color: #2c3e50; }}
-table {{ border-collapse: collapse; width: 100%; }}
+h2 {{ color: #34495e; border-bottom: 2px solid #3498db; }}
+table {{ border-collapse: collapse; width: 100%; margin-top: 20px; }}
 th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
 th {{ background-color: #2c3e50; color: white; }}
 tr:nth-child(even) {{ background-color: #f2f2f2; }}
-.summary {{ background: #ecf0f1; padding: 15px; border-radius: 5px; }}
+.summary {{ background: #ecf0f1; padding: 15px; border-radius: 5px; margin-bottom: 20px; }}
+.vuln-count {{ font-weight: bold; color: #e74c3c; }}
+code {{ background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }}
 </style></head>
 <body>
 <h1>🦅 CyberEagle-Scanner 扫描报告</h1>
 <div class="summary">
 <p><strong>目标:</strong> {url}</p>
 <p><strong>时间:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-<p><strong>漏洞总数:</strong> {total_vulns}</p>
+<p><strong>漏洞总数:</strong> <span class="vuln-count">{total_vulns}</span></p>
 </div>
 <h2>漏洞详情</h2>
 <table>
-<tr><th>模块</th><th>参数</th><th>详情</th><th>Payload</th></tr>
+<tr><th>模块</th><th>详情</th></tr>
 """)
         for module, results in all_results.items():
-            for vuln in results:
-                f.write(f"<tr><td>{module}</td><td>{vuln.get('param','')}</td><td>{vuln.get('details','')}</td><td><code>{vuln.get('payload','')[:60]}</code></td></tr>")
+            if isinstance(results, dict):
+                # ---- MQTT 模块 ----
+                details = f"匿名访问: {'开启' if results.get('anonymous') else '关闭'}"
+                weak = results.get('weak_credentials', [])
+                if weak:
+                    details += f", 弱口令: {', '.join([f'{u}:{p}' for u, p in weak])}"
+                f.write(f"<tr><td>{module}</td><td>{details}</td></tr>")
+            else:
+                # ---- 其他模块 ----
+                for vuln in results:
+                    payload = vuln.get('payload', '')[:60]
+                    f.write(f"<tr><td>{module}</td><td>{vuln.get('param','')}: {vuln.get('details','')} <code>{payload}</code></td></tr>")
         f.write("</table></body></html>")
     
     logger.info(f"✅ 报告已生成: {txt_path}, {html_path}")
@@ -185,7 +232,28 @@ def run_scanners(args):
 
     if args.mqtt:
         logger.info("[*] 开始 MQTT 检测...")
-        print("   [占位] MQTT 检测功能开发中...")
+        try:
+            from scanner.mqtt_scanner import MQTTScanner
+        
+            # 确定 MQTT 主机
+            if args.mqtt_host:
+                host = args.mqtt_host
+            else:
+                from urllib.parse import urlparse
+                parsed = urlparse(url)
+                host = parsed.hostname or 'localhost'
+        
+            port = args.mqtt_port
+        
+            scanner = MQTTScanner(host, port)
+            results = scanner.scan()
+            all_results['mqtt'] = results
+        except ImportError as e:
+            logger.error(f"MQTT模块导入失败: {e}")
+        except Exception as e:
+            logger.error(f"MQTT检测失败: {e}")
+
+
 
     logger.info("=" * 60)
     logger.info("[+] 扫描完成！")
