@@ -1,0 +1,48 @@
+============================================================
+CyberEagle-Scanner 扫描报告
+扫描时间: 2026-09-07 04:36:09
+目标 URL: http://127.0.0.1
+发现漏洞总数: 8
+============================================================
+
+[DIR] 共发现 8 个漏洞
+  1. 状态码: 403
+     参数: .htpasswd
+     Payload: .htpasswd
+     URL: http://127.0.0.1/.htpasswd
+
+  2. 状态码: 403
+     参数: .htaccess
+     Payload: .htaccess
+     URL: http://127.0.0.1/.htaccess
+
+  3. 状态码: 200
+     参数: php.ini
+     Payload: php.ini
+     URL: http://127.0.0.1/php.ini
+
+  4. 状态码: 302
+     参数: index.php
+     Payload: index.php
+     URL: http://127.0.0.1/index.php
+
+  5. 状态码: 200
+     参数: robots.txt
+     Payload: robots.txt
+     URL: http://127.0.0.1/robots.txt
+
+  6. 状态码: 302
+     参数: phpinfo.php
+     Payload: phpinfo.php
+     URL: http://127.0.0.1/phpinfo.php
+
+  7. 状态码: 301
+     参数: docs
+     Payload: docs
+     URL: http://127.0.0.1/docs
+
+  8. 状态码: 403
+     参数: server-status
+     Payload: server-status
+     URL: http://127.0.0.1/server-status
+

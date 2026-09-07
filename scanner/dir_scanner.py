@@ -343,7 +343,10 @@ class DirScanner:
                         'path': path,
                         'status': status,
                         'length': length,
-                        'url': urljoin(self.base_url + '/', path.lstrip('/'))
+                        'url': urljoin(self.base_url + '/', path.lstrip('/')),
+                        'details': f'状态码: {status}',
+                        'param': path,
+                        'payload': path
                     })
 
         # ---- 第5步：打印总结 ----
